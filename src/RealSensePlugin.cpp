@@ -135,9 +135,46 @@ void RealSensePlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
   sensors::SensorManager * smanager = sensors::SensorManager::Instance();
 
   // Get Cameras Renderers
-  this->depthCam = std::dynamic_pointer_cast<sensors::DepthCameraSensor>(
-    smanager->GetSensor(prefix + DEPTH_CAMERA_NAME))
-    ->DepthCamera();
+  std::string depthCamFullName = prefix + DEPTH_CAMERA_NAME;
+  std::cerr << "RealSensePlugin: Model '" << _model->GetName() << "': Attempting to get Depth Camera: '" << depthCamFullName << "'" << std::endl;
+
+  sensors::SensorPtr genericDepthSensorPtr = smanager->GetSensor(depthCamFullName);
+
+  // Check if the sensor was found by name at all
+  if (!genericDepthSensorPtr) {
+      std::cerr << "RealSensePlugin: ERROR! Model '" << _model->GetName() << "': Depth sensor '" << depthCamFullName << "' NOT FOUND in SensorManager." << std::endl;
+      // You MUST return here, or future operations will crash.
+      return;
+  }
+
+  // Check the type of the found sensor (this is very informative)
+  std::cerr << "RealSensePlugin: Model '" << _model->GetName() << "': Found Sensor '" << depthCamFullName << "'. Its type is: " << genericDepthSensorPtr->Type() << std::endl;
+
+  // Step 2: Try to cast it to a DepthCameraSensor
+  std::shared_ptr<sensors::DepthCameraSensor> depthCameraSensorPtr =
+      std::dynamic_pointer_cast<sensors::DepthCameraSensor>(genericDepthSensorPtr);
+
+  // Check if the cast was successful (i.e., if it was actually a DepthCameraSensor)
+  if (!depthCameraSensorPtr) {
+      std::cerr << "RealSensePlugin: ERROR! Model '" << _model->GetName() << "': Failed to dynamic_pointer_cast sensor '" << depthCamFullName << "' to DepthCameraSensor. Is it really a depth camera type in SDF?" << std::endl;
+      // You MUST return here, or future operations will crash.
+      return;
+  }
+
+  // Step 3: Get the underlying DepthCamera renderer
+  this->depthCam = depthCameraSensorPtr->DepthCamera();
+
+  // Final check for the renderer itself (less likely to be null if above passed, but good practice)
+  if (!this->depthCam) {
+      std::cerr << "RealSensePlugin: ERROR! Model '" << _model->GetName() << "': Obtained DepthCameraSensor but its internal DepthCamera renderer is null." << std::endl;
+      return;
+  }
+
+  std::cerr << "RealSensePlugin: Model '" << _model->GetName() << "': Successfully obtained Depth Cam with prefix '" << prefix << "'" << std::endl;
+
+ //  this->depthCam = std::dynamic_pointer_cast<sensors::DepthCameraSensor>(
+    // smanager->GetSensor(prefix + DEPTH_CAMERA_NAME))
+    // ->DepthCamera();
 
   this->ired1Cam = std::dynamic_pointer_cast<sensors::CameraSensor>(
     smanager->GetSensor(prefix + IRED1_CAMERA_NAME))
